@@ -33,6 +33,7 @@
 
 #include <QDir>
 #include <QDialog>
+#include <QSslError>
 #include <ui_Downloader.h>
 
 namespace Ui {
@@ -49,7 +50,7 @@ class Downloader : public QWidget
 {
     Q_OBJECT
 
-signals:
+Q_SIGNALS:
     void downloadFinished (const QString& url, const QString& filepath);
 
 public:
@@ -60,16 +61,18 @@ public:
 
     QString downloadDir() const;
     void setDownloadDir (const QString& downloadDir);
+    bool isCancelled() { return m_cancelled; }
 
-public slots:
+public Q_SLOTS:
     void setUrlId (const QString& url);
     void startDownload (const QUrl& url);
     void setFileName (const QString& file);
     void setUserAgentString (const QString& agent);
     void setUseCustomInstallProcedures (const bool custom);
     void setMandatoryUpdate (const bool mandatory_update);
+    void HandleSslErrors(const QList<QSslError>& errors);
 
-private slots:
+private Q_SLOTS:
     void finished();
     void openDownload();
     void installUpdate();
@@ -93,6 +96,7 @@ private:
 
     bool m_useCustomProcedures;
     bool m_mandatoryUpdate;
+    bool m_cancelled;
 
     QNetworkAccessManager* m_manager;
 };

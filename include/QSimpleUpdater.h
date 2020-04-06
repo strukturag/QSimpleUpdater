@@ -43,6 +43,7 @@
 #endif
 
 class Updater;
+class QNetworkAccessManager;
 
 /**
  * \brief Manages the updater instances
@@ -66,14 +67,18 @@ class Updater;
 class QSU_DECL QSimpleUpdater : public QObject
 {
     Q_OBJECT
-
-signals:
+    
+Q_SIGNALS:
     void checkingFinished (const QString& url);
     void appcastDownloaded (const QString& url, const QByteArray& data);
     void downloadFinished (const QString& url, const QString& filepath);
 
 public:
     static QSimpleUpdater* getInstance();
+    static QNetworkAccessManager* getNetworkManager();
+    static void setNetworkManager(QNetworkAccessManager* manager) {
+        mNetworkManager = manager;
+    }
 
     bool usesCustomAppcast (const QString& url) const;
     bool getNotifyOnUpdate (const QString& url) const;
@@ -91,7 +96,10 @@ public:
     QString getModuleVersion (const QString& url) const;
     QString getUserAgentString (const QString& url) const;
 
-public slots:
+    void downloadUpdate(const QString& url);
+    bool downloadComplete(const QString& url);
+
+public:
     void checkForUpdates (const QString& url);
     void setModuleName (const QString& url, const QString& name);
     void setNotifyOnUpdate (const QString& url, const bool notify);
@@ -109,6 +117,7 @@ protected:
 
 private:
     Updater* getUpdater (const QString& url) const;
+    static QNetworkAccessManager* mNetworkManager;
 };
 
 #endif

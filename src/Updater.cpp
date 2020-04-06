@@ -54,7 +54,7 @@ Updater::Updater()
     m_mandatoryUpdate = false;
 
     m_downloader = new Downloader();
-    m_manager = new QNetworkAccessManager();
+    m_manager = QSimpleUpdater::getNetworkManager();
 
 #if defined Q_OS_WIN
     m_platform = "windows";
@@ -73,8 +73,6 @@ Updater::Updater()
 
     connect (m_downloader, SIGNAL (downloadFinished (QString, QString)),
              this,         SIGNAL (downloadFinished (QString, QString)));
-    connect (m_manager,    SIGNAL (finished (QNetworkReply*)),
-             this,           SLOT (onReply  (QNetworkReply*)));
 }
 
 Updater::~Updater()
@@ -247,7 +245,22 @@ void Updater::checkForUpdates()
     if (!userAgentString().isEmpty())
         request.setRawHeader ("User-Agent", userAgentString().toUtf8());
 
-    m_manager->get (request);
+    reply_ = m_manager->get (request);
+
+    connect (reply_, &QNetworkReply::finished,
+             this, &Updater::onReply);
+
+    QObject::connect(reply_, &QNetworkReply::sslErrors,
+                     this, &Updater::HandleSslErrors);
+}
+
+void Updater::HandleSslErrors(const QList<QSslError>& errors) {
+  for (int i=0; i < errors.size(); i++) {
+    const QSslError& error = errors.at(i);
+    qDebug() << "SSL error: " << error.errorString() << "\n";
+  }
+  // TODO(jojo): Show warning to user and have her accept the error.
+  reply_->ignoreSslErrors();
 }
 
 /**
@@ -365,10 +378,10 @@ void Updater::setMandatoryUpdate(const bool mandatory_update)
 /**
  * Called when the download of the update definitions file is finished.
  */
-void Updater::onReply (QNetworkReply* reply)
+void Updater::onReply ()
 {
     /* Check if we need to redirect */
-    QUrl redirect = reply->attribute (
+    QUrl redirect = reply_->attribute (
                         QNetworkRequest::RedirectionTargetAttribute).toUrl();
     if (!redirect.isEmpty()) {
         setUrl (redirect.toString());
@@ -377,26 +390,26 @@ void Updater::onReply (QNetworkReply* reply)
     }
 
     /* There was a network error */
-    if (reply->error() != QNetworkReply::NoError) {
+    if (reply_->error() != QNetworkReply::NoError) {
         setUpdateAvailable (false);
-        emit checkingFinished (url());
+        /*emit*/ checkingFinished (url());
         return;
     }
 
     /* The application wants to interpret the appcast by itself */
     if (customAppcast()) {
-        emit appcastDownloaded (url(), reply->readAll());
-        emit checkingFinished (url());
+        /*emit*/ appcastDownloaded (url(), reply_->readAll());
+        /*emit*/ checkingFinished (url());
         return;
     }
 
     /* Try to create a JSON document from downloaded data */
-    QJsonDocument document = QJsonDocument::fromJson (reply->readAll());
+    QJsonDocument document = QJsonDocument::fromJson (reply_->readAll());
 
     /* JSON is invalid */
     if (document.isNull()) {
         setUpdateAvailable (false);
-        emit checkingFinished (url());
+        /*emit*/ checkingFinished (url());
         return;
     }
 
@@ -414,7 +427,7 @@ void Updater::onReply (QNetworkReply* reply)
 
     /* Compare latest and current version */
     setUpdateAvailable (compare (latestVersion(), moduleVersion()));
-    emit checkingFinished (url());
+    /*emit*/ checkingFinished (url());
 }
 
 /**
@@ -479,6 +492,19 @@ void Updater::setUpdateAvailable (const bool available)
 
         box.exec();
     }
+}
+
+void Updater::downloadUpdate()
+{
+  m_downloader->setUrlId (url());
+  m_downloader->setFileName (downloadUrl().split ("/").last());
+  m_downloader->setMandatoryUpdate(m_mandatoryUpdate);
+  m_downloader->startDownload (QUrl (downloadUrl()));
+}
+
+bool Updater::downloadComplete()
+{
+  return !m_downloader->isCancelled();
 }
 
 /**

@@ -32,12 +32,13 @@
 
 static QList<QString> URLS;
 static QList<Updater*> UPDATERS;
+QNetworkAccessManager* QSimpleUpdater::mNetworkManager = nullptr;
 
 QSimpleUpdater::~QSimpleUpdater()
 {
     URLS.clear();
 
-    foreach (Updater* updater, UPDATERS)
+    Q_FOREACH (Updater* updater, UPDATERS)
         updater->deleteLater();
 
     UPDATERS.clear();
@@ -50,6 +51,14 @@ QSimpleUpdater* QSimpleUpdater::getInstance()
 {
     static QSimpleUpdater updater;
     return &updater;
+}
+
+QNetworkAccessManager* QSimpleUpdater::getNetworkManager()
+{
+    if (mNetworkManager == nullptr) {
+        mNetworkManager = new QNetworkAccessManager();
+    }
+    return mNetworkManager;
 }
 
 /**
@@ -241,6 +250,15 @@ QString QSimpleUpdater::getUserAgentString (const QString& url) const
     return getUpdater (url)->userAgentString();
 }
 
+void QSimpleUpdater::downloadUpdate(const QString& url)
+{
+  getUpdater(url)->downloadUpdate();
+}
+
+bool QSimpleUpdater::downloadComplete(const QString& url)
+{
+  return getUpdater(url)->downloadComplete();
+}
 /**
  * Instructs the \c Updater instance with the registered \c url to download and
  * interpret the update definitions file.

@@ -40,16 +40,18 @@
 #include <math.h>
 
 #include "Downloader.h"
+#include "QSimpleUpdater.h"
 
 static const QString PARTIAL_DOWN (".part");
 
-Downloader::Downloader (QWidget* parent) : QWidget (parent)
+Downloader::Downloader (QWidget* parent) : QWidget (parent),
+  m_cancelled(false)
 {
     m_ui = new Ui::Downloader;
     m_ui->setupUi (this);
 
     /* Initialize private members */
-    m_manager = new QNetworkAccessManager();
+    m_manager = QSimpleUpdater::getNetworkManager();
 
     /* Initialize internal values */
     m_url = "";
@@ -81,7 +83,6 @@ Downloader::~Downloader()
 {
     delete m_ui;
     delete m_reply;
-    delete m_manager;
 }
 
 /**
@@ -142,7 +143,20 @@ void Downloader::startDownload (const QUrl& url)
     connect (m_reply, SIGNAL (redirected       (QUrl)),
              this,      SLOT (startDownload    (QUrl)));
 
+    QObject::connect(m_reply, &QNetworkReply::sslErrors,
+                     this, &Downloader::HandleSslErrors);
+
+
     showNormal();
+}
+
+void Downloader::HandleSslErrors(const QList<QSslError>& errors) {
+for (int i=0; i < errors.size(); i++) {
+const QSslError& error = errors.at(i);
+qDebug() << "SSL error: " << error.errorString() << "\n";
+}
+// TODO(jojo): Show warning to user and have her accept the error.
+m_reply->ignoreSslErrors();
 }
 
 /**
@@ -171,7 +185,7 @@ void Downloader::finished()
                    m_downloadDir.filePath (m_fileName));
 
     /* Notify application */
-    emit downloadFinished (m_url, m_downloadDir.filePath (m_fileName));
+    /*emit*/ downloadFinished (m_url, m_downloadDir.filePath (m_fileName));
 
     /* Install the update */
     m_reply->close();
@@ -273,6 +287,7 @@ void Downloader::cancelDownload()
 
         if (box.exec() == QMessageBox::Yes) {
             hide();
+            m_cancelled = true;
             m_reply->abort();
             if(m_mandatoryUpdate)
                 QApplication::quit();
@@ -426,7 +441,7 @@ void Downloader::calculateTimeRemaining (qint64 received, qint64 total)
  */
 qreal Downloader::round (const qreal& input)
 {
-    return static_cast<qreal>(roundf (static_cast<float>(input) * 100) / 100);
+    return roundf (input * 100) / 100;
 }
 
 QString Downloader::downloadDir() const

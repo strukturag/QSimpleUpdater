@@ -46,7 +46,7 @@ class QSU_DECL Updater : public QObject
 {
     Q_OBJECT
 
-signals:
+Q_SIGNALS:
     void checkingFinished (const QString& url);
     void downloadFinished (const QString& url, const QString& filepath);
     void appcastDownloaded (const QString& url, const QByteArray& data);
@@ -73,8 +73,12 @@ public:
     bool downloaderEnabled() const;
     bool useCustomInstallProcedures() const;
 
-public slots:
+    void downloadUpdate();
+    bool downloadComplete();
+
+public Q_SLOTS:
     void checkForUpdates();
+    void HandleSslErrors(const QList<QSslError>& errors);
     void setUrl (const QString& url);
     void setModuleName (const QString& name);
     void setNotifyOnUpdate (const bool notify);
@@ -87,14 +91,15 @@ public slots:
     void setUseCustomInstallProcedures (const bool custom);
     void setMandatoryUpdate (const bool mandatory_update);
 
-private slots:
-    void onReply (QNetworkReply* reply);
+private Q_SLOTS:
+    void onReply ();
     void setUpdateAvailable (const bool available);
 
 private:
     bool compare (const QString& x, const QString& y);
 
 private:
+    QNetworkReply* reply_;
     QString m_url;
     QString m_userAgentString;
 
